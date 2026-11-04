@@ -33,7 +33,7 @@ loader() {
     echo -ne "  ${CYAN}➜${NC} $msg "
     for i in {1..20}; do
         sleep 0.03
-        echo -ne "\b\b\b${BOLD}${GREEN}$((i * 5))%${NC} "
+        echo -ne "\b\b\b\b${BOLD}${GREEN}$((i * 5))%${NC} "
     done
     echo -e "${GREEN}✔${NC}"
 }
@@ -53,7 +53,7 @@ main() {
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
-    loader "Downloading Bozo Payloads from GitHub..."
+    loader "Downloading Bozo Payloads..."
     curl -sL "$BASE_URL/libBozoExecuter.dylib" -o "$TEMP/libBozoExecuter.dylib"
     cp "$TEMP/libBozoExecuter.dylib" ~/Applications/Roblox.app/Contents/Resources/
 
@@ -75,7 +75,37 @@ main() {
 
     echo -e "\n${GREEN}${BOLD}Injection Complete. Launching...${NC}"
     sleep 1
+    
     open ~/Applications/Roblox.app
+    
+    # Native UI script injected directly into terminal (No app download needed)
+    osascript -e 'repeat
+        set robloxStatus to "Not Found"
+        try
+            do shell script "pgrep -x RobloxPlayer"
+            set robloxStatus to "Roblox Detected"
+        end try
+        
+        tell application "System Events"
+            set dialogResult to display dialog "Status: " & robloxStatus & return & return & "Paste your script below:" default answer "require(14168421377).tyymenu(\"Tyuiss_RBLX\")" buttons {"X", "Clear", "Execute"} default button "Execute" cancel button "X" with icon note with title "Bozo Executer"
+        end tell
+        
+        if button returned of dialogResult is "X" then
+            exit repeat
+        end if
+        
+        if button returned of dialogResult is "Execute" then
+            set userScript to text returned of dialogResult
+            try
+                do shell script "echo " & quoted form of userScript & " | nc -w 1 127.0.0.1 5599 &"
+                display dialog "Executed successfully!" buttons {"OK"} default button "OK" with icon note
+            on error errMsg
+                display dialog "Connection failed. Is Roblox injected?" buttons {"OK"} default button "OK" with icon stop
+            end try
+        end if
+        delay 5
+    end repeat' &
+    
     rm -rf "$TEMP"
 }
 
