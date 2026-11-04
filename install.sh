@@ -30,6 +30,15 @@ loader() {
 fail() { echo -e "${RED}✘ $1${NC}" >&2; exit 1; }
 
 banner
+
+# --- SIP check ---
+SIP_STATUS=$(csrutil status 2>/dev/null | tr -d '\n' || echo "unknown")
+echo -e "  ${CYAN}SIP:${NC} $SIP_STATUS"
+if echo "$SIP_STATUS" | grep -q "enabled"; then
+    echo -e "  ${RED}${BOLD}WARNING:${NC} SIP is enabled. Injection may be blocked by the OS."
+    echo -e "  ${CYAN}If injection fails, disable SIP in Recovery Mode and re-run.${NC}"
+fi
+
 loader "Killing Roblox..."
 killall -9 RobloxPlayer 2>/dev/null || true
 killall -9 Roblox 2>/dev/null || true
@@ -206,16 +215,24 @@ curl -sL "https://github.com/tyilo/insert_dylib/releases/download/v1.0.0/insert_
 chmod +x "$TEMP/insert_dylib"
 
 RBX_BIN="$ROBLOX_APP/Contents/MacOS/RobloxPlayer"
-[ -f "$RBX_BIN" ] || fail "RobloxPlayer binary missing."
+[ -f "$RBX_BIN" ] || fail "RobloxPlayer binary missing at $RBX_BIN"
 
 loader "Injecting into RobloxPlayer..."
 codesign --remove-signature "$RBX_BIN" 2>/dev/null || true
+
+echo -e "  ${CYAN}insert_dylib output:${NC}"
 "$TEMP/insert_dylib" --strip-codesig --all-yes \
     "@executable_path/../Resources/$DYLIB_NAME" \
-    "$RBX_BIN" "${RBX_BIN}_patched" >/dev/null 2>&1 || fail "insert_dylib failed."
+    "$RBX_BIN" "${RBX_BIN}_patched" || fail "insert_dylib failed (see output above)."
+
 mv "${RBX_BIN}_patched" "$RBX_BIN"
 cp "$TEMP/$DYLIB_NAME" "$ROBLOX_APP/Contents/Resources/"
-codesign --force --deep --sign - "$ROBLOX_APP" >/dev/null 2>&1
+
+loader "Re-signing binary..."
+codesign -f -s - --all-architectures "$RBX_BIN" 2>&1 || fail "Binary re-sign failed."
+
+loader "Re-signing app bundle..."
+codesign --force --deep --sign - "$ROBLOX_APP" 2>&1 || fail "App re-sign failed."
 
 loader "Building Swift frame..."
 cat > "$TEMP/main.swift" << 'ENDOFSWIFT'
