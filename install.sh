@@ -6,7 +6,7 @@ GITHUB_USER="ttmeticks-source"
 GITHUB_REPO="yesure"
 BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
 
-# LOCKED VERSION (Matches the injector and your payload)
+# LOCKED VERSION
 VERSION="version-b09c93298b5d4cd1"
 
 # Colors
@@ -43,55 +43,116 @@ loader() {
 main() {
     banner
     
-    loader "Killing Roblox processes & wiping old client..."
+    loader "Killing Roblox processes..."
     killall -9 RobloxPlayer 2>/dev/null || true
-    rm -rf ~/Applications/Roblox.app
-    rm -rf ~/Applications/BozoExecuter.app
     
-    loader "Downloading Modded Roblox ($VERSION)..."
+    loader "Downloading Roblox Client ($VERSION)..."
     TEMP=$(mktemp -d)
     curl -sL "https://setup.rbxcdn.com/mac/$VERSION-RobloxPlayer.zip" -o "$TEMP/rbx.zip"
     unzip -oq "$TEMP/rbx.zip" -d "$TEMP"
     
     mkdir -p ~/Applications
+    rm -rf ~/Applications/Roblox.app
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
-    loader "Building Bozo UI..."
+    loader "Building Bozo UI (Native Swift)..."
+    # This builds a REAL Swift app with a resizable window
+    cat > "$TEMP/main.swift" << 'ENDOFSWIFT'
+import SwiftUI
+import Network
+
+@main
+struct BozoApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView().frame(minWidth: 600, minHeight: 400)
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var script = "require(14168421377).tyymenu(\"Tyuiss_RBLX\")"
+    @State private var status = "Ready"
+    @State private var isRobloxRunning = false
+    @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Bozo Executer").font(.headline).foregroundColor(.white)
+                Spacer()
+                Circle().fill(isRobloxRunning ? Color.green : Color.red).frame(width: 10, height: 10)
+                Text(isRobloxRunning ? "Roblox Detected" : "Not Found").font(.caption).foregroundColor(.gray)
+            }
+            .padding(.horizontal)
+
+            TextEditor(text: $script)
+                .font(.system(.body, design: .monospaced))
+                .foregroundColor(.white)
+                .padding(8)
+                .background(Color(white: 0.15))
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.3), lineWidth: 1))
+                .padding(.horizontal)
+
+            HStack {
+                Text(status).font(.caption).foregroundColor(.gray)
+                Spacer()
+                Button("Clear") { script = "" }
+                Button("Execute") { executeScript() }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+        .background(Color(white: 0.1))
+        .onAppear { checkRoblox(); checkVersion() }
+        .onReceive(timer) { _ in checkRoblox() }
+    }
+
+    func checkRoblox() {
+        let task = Process()
+        task.launchPath = "/usr/bin/pgrep"
+        task.arguments = ["-x", "RobloxPlayer"]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        try? task.run()
+        task.waitUntilExit()
+        isRobloxRunning = task.terminationStatus == 0
+    }
+
+    func checkVersion() {
+        guard let url = URL(string: "https://raw.githubusercontent.com/ttmeticks-source/yesure/main/version.txt") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data = data, let latest = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                DispatchQueue.main.async { if latest != "1.0.0" { status = "Out of Date!" } }
+            }
+        }.resume()
+    }
+
+    func executeScript() {
+        status = "Connecting..."
+        let conn = NWConnection(host: "127.0.0.1", port: 5599, using: .tcp)
+        conn.stateUpdateHandler = { st in
+            if case .ready = st {
+                conn.send(content: script.data(using: .utf8), completion: .contentProcessed { error in
+                    DispatchQueue.main.async { status = error == nil ? "Executed!" : "Failed." }
+                    conn.cancel()
+                })
+            } else if case .failed = st { DispatchQueue.main.async { status = "Connection failed." }; conn.cancel() }
+        }
+        conn.start(queue: .global())
+    }
+}
+ENDOFSWIFT
+
+    # Compile the Swift app (No -O flag to prevent hangs)
+    swiftc -parse-as-library "$TEMP/main.swift" -o "$TEMP/BozoExecuter" 2>/dev/null || true
+    
+    # Build the .app bundle
     mkdir -p "$TEMP/BozoExecuter.app/Contents/MacOS"
     mkdir -p "$TEMP/BozoExecuter.app/Contents/Resources"
-    
-    cat > "$TEMP/BozoExecuter.app/Contents/MacOS/BozoExecuter" << 'ENDOFSCRIPT'
-#!/usr/bin/osascript
-on run
-    repeat
-        set robloxStatus to "Not Found"
-        try
-            do shell script "pgrep -x RobloxPlayer > /dev/null"
-            set robloxStatus to "Roblox Detected"
-        on error
-            set robloxStatus to "Not Found"
-        end try
-        tell application "System Events"
-            -- The "Cancel" button acts as the X. The frame is large by default.
-            set dialogResult to display dialog "Status: " & robloxStatus & return & return & "Paste your script below:" default answer "require(14168421377).tyymenu(\"Tyuiss_RBLX\")" buttons {"X", "Clear", "Execute"} default button "Execute" cancel button "X" with icon note with title "Bozo Executer"
-        end tell
-        if button returned of dialogResult is "X" then exit repeat
-        if button returned of dialogResult is "Execute" then
-            set userScript to text returned of dialogResult
-            try
-                do shell script "echo " & quoted form of userScript & " | nc -w 1 127.0.0.1 5599 &"
-                display dialog "Executed successfully!" buttons {"OK"} default button "OK" with icon note
-            on error
-                display dialog "Connection failed." buttons {"OK"} default button "OK" with icon stop
-            end try
-        end if
-        delay 5
-    end repeat
-end run
-ENDOFSCRIPT
-    
-    chmod +x "$TEMP/BozoExecuter.app/Contents/MacOS/BozoExecuter"
+    mv "$TEMP/BozoExecuter" "$TEMP/BozoExecuter.app/Contents/MacOS/BozoExecuter"
     
     cat > "$TEMP/BozoExecuter.app/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -102,10 +163,12 @@ ENDOFSCRIPT
     <key>CFBundleIdentifier</key><string>com.c0oled.bozo</string>
     <key>CFBundleName</key><string>Bozo Executer</string>
     <key>CFBundlePackageType</key><string>APPL</string>
+    <key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict>
 </plist>
 PLIST
-    
+
+    rm -rf ~/Applications/BozoExecuter.app
     mv "$TEMP/BozoExecuter.app" ~/Applications/
     xattr -cr ~/Applications/BozoExecuter.app
     codesign --force --deep --sign - ~/Applications/BozoExecuter.app >/dev/null 2>&1
@@ -135,8 +198,8 @@ ENDOFDYLIB
     curl -sL "https://github.com/tyilo/insert_dylib/releases/download/v1.0.0/insert_dylib" -o "$TEMP/insert_dylib"
     chmod +x "$TEMP/insert_dylib"
 
-    loader "Modifying Roblox..."
-    # Inject into libmimalloc.3.dylib (The correct way for Mac)
+    loader "Injecting into libmimalloc.3.dylib (Real Modification)..."
+    # THIS IS THE ACTUAL OPIUMWARE METHOD
     codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib >/dev/null 2>&1 || true
     
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
