@@ -1,38 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- YOUR GITHUB REPO ---
+# --- CONFIGURATION ---
 GITHUB_USER="ttmeticks-source"
 GITHUB_REPO="yesure"
 BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
 VERSION="version-b09c93298b5d4cd1"
 
-# Colors
-G='\033[0;32m'; C='\033[0;36m'; R='\033[0m'; B='\033[1m'
-CHECK="${G}✔${R}"
+# --- COLORS ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+PURPLE='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m'
 
 banner() {
     clear
-    echo -e "${C}${B}"
+    # Made the Bozo color a cool purple/cyan mix
+    echo -e "${PURPLE}${BOLD}"
     echo "  ██████╗  ██████╗ ███████╗ ██████╗ "
     echo "  ██╔══██╗██╔═══██╗╚══███╔╝██╔═══██╗"
     echo "  ██████╔╝██║   ██║  ███╔╝ ██║   ██║"
     echo "  ██╔══██╗██║   ██║ ███╔╝  ██║   ██║"
     echo "  ██████╔╝╚██████╔╝███████╗╚██████╔╝"
     echo "  ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝ "
-    echo -e "${R}"
-    echo -e "${C}Made By: C0oled!${R}\n"
+    echo -e "${NC}"
+    echo -e "${CYAN}Made By: C0oled!${NC}\n"
 }
 
-# Percentage loader
+# Improved Percentage Loader
 loader() {
     local msg="$1"
-    echo -ne "  ${C}➜${R} $msg"
     for i in {1..20}; do
+        echo -ne "\r  ${CYAN}➜${NC} $msg ${BOLD}$((i * 5))%${NC}   "
         sleep 0.05
-        echo -ne "\r  ${C}➜${R} $msg ${B}$((i * 5))%${R}"
     done
-    echo -e "\r\033[K  ${G}✔${R} $msg ${B}100%${R}"
+    echo -e "\r\033[K  ${GREEN}✔${NC} $msg ${BOLD}100%${NC}"
 }
 
 main() {
@@ -44,19 +48,22 @@ main() {
     TEMP=$(mktemp -d)
     curl -sL "https://setup.rbxcdn.com/mac/$VERSION-RobloxPlayer.zip" -o "$TEMP/rbx.zip"
     unzip -oq "$TEMP/rbx.zip" -d "$TEMP"
+    
     mkdir -p ~/Applications
     rm -rf ~/Applications/Roblox.app
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
     loader "Downloading Bozo Payloads"
+    # Fetching from your GitHub repo root
     curl -sL "$BASE_URL/libBozoExecuter.dylib" -o "$TEMP/libBozoExecuter.dylib"
     cp "$TEMP/libBozoExecuter.dylib" ~/Applications/Roblox.app/Contents/Resources/
 
+    # Fetching the injector
     curl -sL "$BASE_URL/insert_dylib" -o "$TEMP/insert_dylib"
     chmod +x "$TEMP/insert_dylib"
 
-    loader "Injecting Client Modification"
+    loader "Injecting Bozo Dylib"
     codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer >/dev/null 2>&1 || true
     
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
@@ -69,10 +76,10 @@ main() {
     loader "Signing Modified Client"
     codesign --force --deep --sign - ~/Applications/Roblox.app >/dev/null 2>&1
 
-    echo -e "\n${G}${B}Installation Complete. Launching...${R}"
+    # Launching Both Apps
+    echo -e "\n${GREEN}${BOLD}Installation Complete. Launching...${NC}"
     sleep 1
     
-    # THIS OPENS BOTH APPS
     open ~/Applications/Roblox.app
     open ~/Applications/BozoExecuter.app
     
