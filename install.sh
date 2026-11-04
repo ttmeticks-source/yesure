@@ -31,13 +31,8 @@ fail() { echo -e "${RED}✘ $1${NC}" >&2; exit 1; }
 
 banner
 
-# --- SIP check ---
 SIP_STATUS=$(csrutil status 2>/dev/null | tr -d '\n' || echo "unknown")
 echo -e "  ${CYAN}SIP:${NC} $SIP_STATUS"
-if echo "$SIP_STATUS" | grep -q "enabled"; then
-    echo -e "  ${RED}${BOLD}WARNING:${NC} SIP is enabled. Injection may be blocked by the OS."
-    echo -e "  ${CYAN}If injection fails, disable SIP in Recovery Mode and re-run.${NC}"
-fi
 
 loader "Killing Roblox..."
 killall -9 RobloxPlayer 2>/dev/null || true
@@ -206,32 +201,27 @@ static void bozo_init(void) {
 }
 ENDOFDYLIB
 
-clang -dynamiclib -arch arm64 -arch x86_64 \
+clang -dynamiclib -arch x86_64 \
     -framework Foundation \
     -o "$TEMP/$DYLIB_NAME" "$TEMP/executor.m" || fail "Dylib compile failed."
 
-loader "Fetching insert_dylib..."
-curl -sL "https://github.com/tyilo/insert_dylib/releases/download/v1.0.0/insert_dylib" -o "$TEMP/insert_dylib"
-chmod +x "$TEMP/insert_dylib"
+loader "Fetching optool..."
+curl -sL "https://github.com/alexzielenski/optool/releases/download/v0.1/optool" -o "$TEMP/optool"
+chmod +x "$TEMP/optool"
 
 RBX_BIN="$ROBLOX_APP/Contents/MacOS/RobloxPlayer"
 [ -f "$RBX_BIN" ] || fail "RobloxPlayer binary missing at $RBX_BIN"
 
-loader "Injecting into RobloxPlayer..."
+loader "Injecting with optool..."
 codesign --remove-signature "$RBX_BIN" 2>/dev/null || true
 
-echo -e "  ${CYAN}insert_dylib output:${NC}"
-"$TEMP/insert_dylib" --strip-codesig --all-yes \
-    "@executable_path/../Resources/$DYLIB_NAME" \
-    "$RBX_BIN" "${RBX_BIN}_patched" || fail "insert_dylib failed (see output above)."
+echo -e "  ${CYAN}optool output:${NC}"
+"$TEMP/optool" install -c load -p "@executable_path/$DYLIB_NAME" -t "$RBX_BIN" || fail "optool injection failed (see output above)."
 
-mv "${RBX_BIN}_patched" "$RBX_BIN"
-cp "$TEMP/$DYLIB_NAME" "$ROBLOX_APP/Contents/Resources/"
+cp "$TEMP/$DYLIB_NAME" "$ROBLOX_APP/Contents/MacOS/"
 
-loader "Re-signing binary..."
+loader "Re-signing..."
 codesign -f -s - --all-architectures "$RBX_BIN" 2>&1 || fail "Binary re-sign failed."
-
-loader "Re-signing app bundle..."
 codesign --force --deep --sign - "$ROBLOX_APP" 2>&1 || fail "App re-sign failed."
 
 loader "Building Swift frame..."
