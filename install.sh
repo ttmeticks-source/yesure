@@ -1,8 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 APP="$HOME/Applications/BozoExecuter.app"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+ICON_SRC="$HOME/Desktop/icon.png"
+
+if [ ! -f "$ICON_SRC" ]; then
+    echo "Missing $ICON_SRC"
+    echo "Save your image as icon.png on your Desktop first."
+    exit 1
+fi
+
+echo "➜ Building .icns..."
+ICONSET="$T/AppIcon.iconset"
+mkdir -p "$ICONSET"
+
+# Generate all required macOS icon sizes
+sips -z 16 16     "$ICON_SRC" --out "$ICONSET/icon_16x16.png"      >/dev/null
+sips -z 32 32     "$ICON_SRC" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
+sips -z 32 32     "$ICON_SRC" --out "$ICONSET/icon_32x32.png"      >/dev/null
+sips -z 64 64     "$ICON_SRC" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null
+sips -z 128 128   "$ICON_SRC" --out "$ICONSET/icon_128x128.png"    >/dev/null
+sips -z 256 256   "$ICON_SRC" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
+sips -z 256 256   "$ICON_SRC" --out "$ICONSET/icon_256x256.png"    >/dev/null
+sips -z 512 512   "$ICON_SRC" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
+sips -z 512 512   "$ICON_SRC" --out "$ICONSET/icon_512x512.png"    >/dev/null
+cp "$ICON_SRC" "$ICONSET/icon_512x512@2x.png"
+
+iconutil -c icns "$ICONSET" -o "$T/AppIcon.icns"
+
+echo "➜ Compiling Swift app..."
 mkdir -p "$T/BozoExecuter.app/Contents/MacOS"
+mkdir -p "$T/BozoExecuter.app/Contents/Resources"
 
 cat > "$T/main.swift" << 'SWIFT'
 import SwiftUI
@@ -102,7 +131,9 @@ struct ContentView: View {
 SWIFT
 
 swiftc -parse-as-library "$T/main.swift" -o "$T/BozoExecuter.app/Contents/MacOS/BozoExecuter"
-mkdir -p "$T/BozoExecuter.app/Contents/Resources"
+
+# Move the icon into the bundle
+mv "$T/AppIcon.icns" "$T/BozoExecuter.app/Contents/Resources/"
 
 cat > "$T/BozoExecuter.app/Contents/Info.plist" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -111,13 +142,17 @@ cat > "$T/BozoExecuter.app/Contents/Info.plist" << 'PLIST'
 <key>CFBundleExecutable</key><string>BozoExecuter</string>
 <key>CFBundleIdentifier</key><string>com.c0oled.bozo</string>
 <key>CFBundleName</key><string>Bozo Executer</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>11.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
 
+echo "➜ Bundling and signing..."
 rm -rf "$APP"
 mv "$T/BozoExecuter.app" "$HOME/Applications/"
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+
+echo "➜ Launching..."
 open "$APP"
