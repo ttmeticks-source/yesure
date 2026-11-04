@@ -1,75 +1,62 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- CONFIGURATION ---
+# --- YOUR GITHUB REPO ---
 GITHUB_USER="ttmeticks-source"
 GITHUB_REPO="yesure"
 BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
 VERSION="version-b09c93298b5d4cd1"
 
-# --- COLORS ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+# Colors
+G='\033[0;32m'; C='\033[0;36m'; R='\033[0m'; B='\033[1m'
+CHECK="${G}✔${R}"
 
 banner() {
     clear
-    echo -e "${CYAN}${BOLD}"
+    echo -e "${C}${B}"
     echo "  ██████╗  ██████╗ ███████╗ ██████╗ "
     echo "  ██╔══██╗██╔═══██╗╚══███╔╝██╔═══██╗"
     echo "  ██████╔╝██║   ██║  ███╔╝ ██║   ██║"
     echo "  ██╔══██╗██║   ██║ ███╔╝  ██║   ██║"
     echo "  ██████╔╝╚██████╔╝███████╗╚██████╔╝"
     echo "  ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝ "
-    echo -e "${NC}"
-    echo -e "${CYAN}Made By: C0oled!${NC}\n"
+    echo -e "${R}"
+    echo -e "${C}Made By: C0oled!${R}\n"
 }
 
-progress_bar() {
+# Percentage loader
+loader() {
     local msg="$1"
-    echo -ne "${CYAN}➜${NC} $msg "
-    for i in {1..15}; do
-        echo -ne "${BOLD}${GREEN}#${NC}"
-        sleep 0.04
+    echo -ne "  ${C}➜${R} $msg"
+    for i in {1..20}; do
+        sleep 0.05
+        echo -ne "\r  ${C}➜${R} $msg ${B}$((i * 5))%${R}"
     done
-    echo -e " ${GREEN}✔${NC}"
+    echo -e "\r\033[K  ${G}✔${R} $msg ${B}100%${R}"
 }
 
 main() {
     banner
 
-    # 1. Kill Roblox
-    progress_bar "Killing Roblox Processes..."
+    loader "Modifying Roblox Client"
     killall -9 RobloxPlayer 2>/dev/null || true
-
-    # 2. Download Roblox
-    progress_bar "Downloading Roblox Client..."
+    
     TEMP=$(mktemp -d)
     curl -sL "https://setup.rbxcdn.com/mac/$VERSION-RobloxPlayer.zip" -o "$TEMP/rbx.zip"
     unzip -oq "$TEMP/rbx.zip" -d "$TEMP"
-    
-    # Ensure Applications folder exists
     mkdir -p ~/Applications
     rm -rf ~/Applications/Roblox.app
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
-    # 3. Download Dylib from your GitHub
-    progress_bar "Fetching Bozo Dylib..."
-    # Looks for the dylib in the root of the repo, not /bin/
+    loader "Downloading Bozo Payloads"
     curl -sL "$BASE_URL/libBozoExecuter.dylib" -o "$TEMP/libBozoExecuter.dylib"
     cp "$TEMP/libBozoExecuter.dylib" ~/Applications/Roblox.app/Contents/Resources/
 
-    # 4. Download Injector from your GitHub
-    progress_bar "Fetching Injector..."
-    # Looks for insert_dylib in the root of the repo
     curl -sL "$BASE_URL/insert_dylib" -o "$TEMP/insert_dylib"
     chmod +x "$TEMP/insert_dylib"
 
-    # 5. Inject
-    progress_bar "Injecting Dylib into Roblox..."
+    loader "Injecting Client Modification"
     codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer >/dev/null 2>&1 || true
     
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
@@ -79,14 +66,16 @@ main() {
 
     mv ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer
 
-    # 6. Sign
-    progress_bar "Signing Modified Client..."
+    loader "Signing Modified Client"
     codesign --force --deep --sign - ~/Applications/Roblox.app >/dev/null 2>&1
 
-    # 7. Launch
-    echo -e "\n${GREEN}${BOLD}Installation Complete.${R}"
+    echo -e "\n${G}${B}Installation Complete. Launching...${R}"
     sleep 1
+    
+    # THIS OPENS BOTH APPS
     open ~/Applications/Roblox.app
+    open ~/Applications/BozoExecuter.app
+    
     rm -rf "$TEMP"
 }
 
