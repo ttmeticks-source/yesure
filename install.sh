@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- CONFIGURATION ---
 GITHUB_USER="ttmeticks-source"
 GITHUB_REPO="yesure"
 BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
@@ -29,18 +30,20 @@ banner() {
 
 loader() {
     local msg="$1"
+    echo -ne "  ${CYAN}➜${NC} $msg "
     for i in {1..20}; do
-        echo -ne "\r  ${CYAN}➜${NC} $msg ${BOLD}$((i * 5))%${NC}   "
-        sleep 0.05
+        sleep 0.03
+        echo -ne "\b\b\b${BOLD}${GREEN}$((i * 5))%${NC} "
     done
-    echo -e "\r\033[K  ${GREEN}✔${NC} $msg ${BOLD}100%${NC}"
+    echo -e "${GREEN}✔${NC}"
 }
 
 main() {
     banner
-    loader "Modifying Roblox Client"
+    loader "Killing Roblox processes..."
     killall -9 RobloxPlayer 2>/dev/null || true
     
+    loader "Downloading Roblox Client..."
     TEMP=$(mktemp -d)
     curl -sL "https://setup.rbxcdn.com/mac/$VERSION-RobloxPlayer.zip" -o "$TEMP/rbx.zip"
     unzip -oq "$TEMP/rbx.zip" -d "$TEMP"
@@ -50,15 +53,16 @@ main() {
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
-    loader "Downloading Bozo Payloads"
+    loader "Downloading Bozo Payloads from GitHub..."
     curl -sL "$BASE_URL/libBozoExecuter.dylib" -o "$TEMP/libBozoExecuter.dylib"
     cp "$TEMP/libBozoExecuter.dylib" ~/Applications/Roblox.app/Contents/Resources/
 
     curl -sL "$BASE_URL/insert_dylib" -o "$TEMP/insert_dylib"
     chmod +x "$TEMP/insert_dylib"
 
-    loader "Injecting Client Modification"
+    loader "Injecting Dylib..."
     codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer >/dev/null 2>&1 || true
+    
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
       "@executable_path/../Resources/libBozoExecuter.dylib" \
       ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer \
@@ -66,13 +70,12 @@ main() {
 
     mv ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer
 
-    loader "Signing Modified Client"
+    loader "Signing Client..."
     codesign --force --deep --sign - ~/Applications/Roblox.app >/dev/null 2>&1
 
-    echo -e "\n${GREEN}${BOLD}Installation Complete. Launching...${NC}"
+    echo -e "\n${GREEN}${BOLD}Injection Complete. Launching...${NC}"
     sleep 1
     open ~/Applications/Roblox.app
-    open ~/Applications/BozoExecuter.app
     rm -rf "$TEMP"
 }
 
