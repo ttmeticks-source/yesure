@@ -1,108 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
+APP="$HOME/Applications/BozoExecuter.app"
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/BozoExecuter.app/Contents/MacOS"
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
-EXECUTOR_APP="$HOME/Applications/BozoExecuter.app"
-
-banner() {
-    clear
-    echo -e "${CYAN}${BOLD}"
-    echo "  ██████╗  ██████╗ ███████╗ ██████╗ "
-    echo "  ██╔══██╗██╔═══██╗╚══███╔╝██╔═══██╗"
-    echo "  ██████╔╝██║   ██║  ███╔╝ ██║   ██║"
-    echo "  ██╔══██╗██║   ██║ ███╔╝  ██║   ██║"
-    echo "  ██████╔╝╚██████╔╝███████╗╚██████╔╝"
-    echo "  ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝ "
-    echo -e "      ${CYAN}>>> BOZO EXECUTER (Opiumware Bridge) <<<${NC}"
-    echo -e "          ${CYAN}Made By: C0oled!${NC}\n"
-}
-
-loader() {
-    local msg="$1"
-    echo -ne "  ${CYAN}➜${NC} $msg "
-    for i in {1..20}; do sleep 0.02; echo -ne "\b\b\b\b${BOLD}${GREEN}$((i * 5))%${NC} "; done
-    echo -e "${GREEN}✔${NC}"
-}
-
-fail() { echo -e "${RED}✘ $1${NC}" >&2; exit 1; }
-
-banner
-
-loader "Checking for Opiumware..."
-if [ ! -d "/Applications/Opiumware.app" ] && [ ! -d "$HOME/Applications/Opiumware.app" ]; then
-    echo -e "\n  ${RED}${BOLD}Opiumware not found.${NC}"
-    echo -e "  Install it from opiumware.com first, launch it once, then re-run this script."
-    echo -e "  This script only builds a custom UI that talks to Opiumware's bridge.\n"
-    exit 1
-fi
-echo -e "  ${GREEN}Opiumware found.${NC}"
-
-loader "Building Swift frame..."
-TEMP=$(mktemp -d)
-trap 'rm -rf "$TEMP"' EXIT
-
-cat > "$TEMP/main.swift" << 'ENDOFSWIFT'
+cat > "$T/main.swift" << 'SWIFT'
 import SwiftUI
 import Network
 
-struct ExecutorBridge: ObservableObject {
+final class Bridge: ObservableObject {
     @Published var status = "Disconnected"
     @Published var output = ""
-    @Published var port: UInt16 = 8390
+    private var conn: NWConnection?
 
-    private var connection: NWConnection?
-
-    func connect() {
-        disconnect()
-        guard let p = NWEndpoint.Port(rawValue: port) else {
-            status = "Bad port"
-            return
-        }
-        let conn = NWConnection(host: "127.0.0.1", port: p, using: .tcp)
-        conn.stateUpdateHandler = { [weak self] s in
+    func connect(port: UInt16) {
+        conn?.cancel()
+        guard let p = NWEndpoint.Port(rawValue: port) else { return }
+        let c = NWConnection(host: "127.0.0.1", port: p, using: .tcp)
+        c.stateUpdateHandler = { [weak self] s in
             DispatchQueue.main.async {
                 switch s {
-                case .ready:
-                    self?.status = "Connected :\(self?.port ?? 0)"
-                    self?.connection = conn
-                    self?.receive(on: conn)
-                case .failed, .cancelled, .waiting:
-                    self?.status = "Disconnected"
-                    self?.connection = nil
-                default:
-                    break
+                case .ready: self?.status = "Connected :\(port)"; self?.conn = c; self?.recv(c)
+                case .failed, .cancelled, .waiting: self?.status = "Disconnected"; self?.conn = nil
+                default: break
                 }
             }
         }
-        conn.start(queue: .global())
+        c.start(queue: .global())
     }
 
-    func disconnect() {
-        connection?.cancel()
-        connection = nil
-        status = "Disconnected"
-    }
-
-    private func receive(on conn: NWConnection) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, err in
-            if let data = data, let text = String(data: data, encoding: .utf8) {
-                DispatchQueue.main.async { self?.output += text }
+    private func recv(_ c: NWConnection) {
+        c.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] d, _, _, e in
+            if let d = d, let t = String(data: d, encoding: .utf8) {
+                DispatchQueue.main.async { self?.output += t }
             }
-            if err == nil {
-                self?.receive(on: conn)
-            }
+            if e == nil { self?.recv(c) }
         }
     }
 
-    func execute(_ script: String) {
-        guard let conn = connection, let data = script.data(using: .utf8) else {
-            output += "\nNot connected.\n"
-            return
-        }
-        conn.send(content: data, completion: .contentProcessed { [weak self] err in
-            if let err = err {
-                DispatchQueue.main.async { self?.output += "\nSend error: \(err.localizedDescription)\n" }
-            }
+    func send(_ s: String, port: UInt16) {
+        if conn == nil { connect(port: port) }
+        guard let c = conn, let d = s.data(using: .utf8) else { output += "\nNot connected.\n"; return }
+        c.send(content: d, completion: .contentProcessed { [weak self] e in
+            if let e = e { DispatchQueue.main.async { self?.output += "\nSend: \(e.localizedDescription)\n" } }
         })
     }
 }
@@ -115,8 +55,9 @@ struct BozoApp: App {
 }
 
 struct ContentView: View {
-    @StateObject private var bridge = ExecutorBridge()
+    @StateObject private var b = Bridge()
     @State private var script = "print(\"hello from Bozo\")"
+    @State private var portStr = "5599"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -124,16 +65,11 @@ struct ContentView: View {
                 Text("Bozo Executer").font(.headline)
                 Spacer()
                 Text("Port").font(.caption).foregroundColor(.secondary)
-                TextField("", value: $bridge.port, formatter: NumberFormatter())
-                    .frame(width: 70)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.caption, design: .monospaced))
-                Circle()
-                    .fill(bridge.status.hasPrefix("Connected") ? Color.green : Color.red)
-                    .frame(width: 10, height: 10)
-                Text(bridge.status).font(.caption).foregroundColor(.secondary)
-                Button(bridge.status.hasPrefix("Connected") ? "Reconnect" : "Connect") {
-                    bridge.connect()
+                TextField("", text: $portStr).frame(width: 70).textFieldStyle(.roundedBorder)
+                Circle().fill(b.status.hasPrefix("Connected") ? Color.green : Color.red).frame(width: 10, height: 10)
+                Text(b.status).font(.caption).foregroundColor(.secondary)
+                Button(b.status.hasPrefix("Connected") ? "Reconnect" : "Connect") {
+                    b.connect(port: UInt16(portStr) ?? 5599)
                 }
             }.padding()
 
@@ -146,35 +82,29 @@ struct ContentView: View {
                 .padding(.horizontal)
 
             ScrollView {
-                Text(bridge.output)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
+                Text(b.output).font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(8)
             }
             .frame(height: 160)
             .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(6)
-            .padding(.horizontal)
+            .cornerRadius(6).padding(.horizontal)
 
             HStack {
-                Button("Execute") { bridge.execute(script) }
-                    .disabled(!bridge.status.hasPrefix("Connected"))
+                Button("Execute") { b.send(script, port: UInt16(portStr) ?? 5599) }
+                    .disabled(!b.status.hasPrefix("Connected"))
                 Spacer()
-                Button("Clear") { bridge.output = "" }
+                Button("Clear") { b.output = "" }
             }.padding()
         }
-        .onAppear { bridge.connect() }
+        .onAppear { b.connect(port: UInt16(portStr) ?? 5599) }
     }
 }
-ENDOFSWIFT
+SWIFT
 
-swiftc -parse-as-library "$TEMP/main.swift" -o "$TEMP/BozoExecuter" 2>&1 | grep -v "warning:" || fail "Swift build failed."
+swiftc -parse-as-library "$T/main.swift" -o "$T/BozoExecuter.app/Contents/MacOS/BozoExecuter"
+mkdir -p "$T/BozoExecuter.app/Contents/Resources"
 
-mkdir -p "$TEMP/BozoExecuter.app/Contents/MacOS"
-mkdir -p "$TEMP/BozoExecuter.app/Contents/Resources"
-mv "$TEMP/BozoExecuter" "$TEMP/BozoExecuter.app/Contents/MacOS/"
-
-cat > "$TEMP/BozoExecuter.app/Contents/Info.plist" << PLIST
+cat > "$T/BozoExecuter.app/Contents/Info.plist" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -187,14 +117,7 @@ cat > "$TEMP/BozoExecuter.app/Contents/Info.plist" << PLIST
 </dict></plist>
 PLIST
 
-rm -rf "$EXECUTOR_APP"
-mv "$TEMP/BozoExecuter.app" "$HOME/Applications/"
-codesign --force --deep --sign - "$EXECUTOR_APP" >/dev/null 2>&1 || true
-
-loader "Launching..."
-sleep 1
-open "$EXECUTOR_APP"
-
-echo -e "\n${GREEN}${BOLD}Done.${NC}"
-echo -e "  App: $EXECUTOR_APP"
-echo -e "  Bridge: Opiumware on 127.0.0.1:8390-8399"
+rm -rf "$APP"
+mv "$T/BozoExecuter.app" "$HOME/Applications/"
+codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+open "$APP"
