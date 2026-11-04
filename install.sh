@@ -60,9 +60,9 @@ cat > "$TEMP/executor.m" << 'ENDOFDYLIB'
 #import <dispatch/dispatch.h>
 #import <mach-o/dyld.h>
 #import <dlfcn.h>
-#import <pthread.h>
-#import <string.h>
-#import <stdio.h>
+#include <pthread.h>
+#include <string.h>
+#include <stdio.h>
 
 typedef struct lua_State lua_State;
 typedef int (*lua_CFunction)(lua_State*);
@@ -199,8 +199,7 @@ ENDOFDYLIB
 
 clang -dynamiclib -arch arm64 -arch x86_64 \
     -framework Foundation \
-    -o "$TEMP/$DYLIB_NAME" "$TEMP/executor.m" 2>&1 | grep -v "warning:" || true
-[ -f "$TEMP/$DYLIB_NAME" ] || fail "Dylib compile failed."
+    -o "$TEMP/$DYLIB_NAME" "$TEMP/executor.m" || fail "Dylib compile failed."
 
 loader "Fetching insert_dylib..."
 curl -sL "https://github.com/tyilo/insert_dylib/releases/download/v1.0.0/insert_dylib" -o "$TEMP/insert_dylib"
