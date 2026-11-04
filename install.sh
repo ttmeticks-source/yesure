@@ -5,6 +5,8 @@ set -euo pipefail
 GITHUB_USER="ttmeticks-source"
 GITHUB_REPO="yesure"
 BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
+
+# LOCKED VERSION (Matches the injector and your payload)
 VERSION="version-b09c93298b5d4cd1"
 
 # Colors
@@ -41,21 +43,21 @@ loader() {
 main() {
     banner
     
-    loader "Killing Roblox processes..."
+    loader "Killing Roblox processes & wiping old client..."
     killall -9 RobloxPlayer 2>/dev/null || true
+    rm -rf ~/Applications/Roblox.app
+    rm -rf ~/Applications/BozoExecuter.app
     
-    loader "Downloading Roblox Client..."
+    loader "Downloading Modded Roblox ($VERSION)..."
     TEMP=$(mktemp -d)
     curl -sL "https://setup.rbxcdn.com/mac/$VERSION-RobloxPlayer.zip" -o "$TEMP/rbx.zip"
     unzip -oq "$TEMP/rbx.zip" -d "$TEMP"
     
     mkdir -p ~/Applications
-    rm -rf ~/Applications/Roblox.app
     mv "$TEMP/RobloxPlayer.app" ~/Applications/Roblox.app
     xattr -cr ~/Applications/Roblox.app
 
     loader "Building Bozo UI..."
-    # THE BIGGER FRAME AND TOP LEFT NAME
     mkdir -p "$TEMP/BozoExecuter.app/Contents/MacOS"
     mkdir -p "$TEMP/BozoExecuter.app/Contents/Resources"
     
@@ -104,7 +106,6 @@ ENDOFSCRIPT
 </plist>
 PLIST
     
-    rm -rf ~/Applications/BozoExecuter.app
     mv "$TEMP/BozoExecuter.app" ~/Applications/
     xattr -cr ~/Applications/BozoExecuter.app
     codesign --force --deep --sign - ~/Applications/BozoExecuter.app >/dev/null 2>&1
@@ -127,7 +128,6 @@ static void BozoInit(void) {
     });
 }
 ENDOFDYLIB
-    # Compile it locally on the user's Mac (fast and requires no Xcode)
     clang -dynamiclib -arch arm64 -arch x86_64 -framework Cocoa -framework Foundation -o "$TEMP/libBozoExecuter.dylib" "$TEMP/dylib.m"
     cp "$TEMP/libBozoExecuter.dylib" ~/Applications/Roblox.app/Contents/Resources/
 
@@ -136,7 +136,7 @@ ENDOFDYLIB
     chmod +x "$TEMP/insert_dylib"
 
     loader "Modifying Roblox..."
-    # THIS INJECTS INTO libmimalloc.3.dylib - The actual Mac modification
+    # Inject into libmimalloc.3.dylib (The correct way for Mac)
     codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib >/dev/null 2>&1 || true
     
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
