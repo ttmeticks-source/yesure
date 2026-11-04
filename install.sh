@@ -2,6 +2,9 @@
 set -euo pipefail
 
 # --- CONFIGURATION ---
+GITHUB_USER="ttmeticks-source"
+GITHUB_REPO="yesure"
+BASE_URL="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main"
 VERSION="version-b09c93298b5d4cd1"
 
 # Colors
@@ -52,11 +55,10 @@ main() {
     xattr -cr ~/Applications/Roblox.app
 
     loader "Building Bozo UI..."
-    # Create the App Bundle structure inside the temp folder
+    # THE BIGGER FRAME AND TOP LEFT NAME
     mkdir -p "$TEMP/BozoExecuter.app/Contents/MacOS"
     mkdir -p "$TEMP/BozoExecuter.app/Contents/Resources"
     
-    # Write the AppleScript GUI directly into the app
     cat > "$TEMP/BozoExecuter.app/Contents/MacOS/BozoExecuter" << 'ENDOFSCRIPT'
 #!/usr/bin/osascript
 on run
@@ -69,6 +71,7 @@ on run
             set robloxStatus to "Not Found"
         end try
         tell application "System Events"
+            -- The "Cancel" button acts as the X. The frame is large by default.
             set dialogResult to display dialog "Status: " & robloxStatus & return & return & "Paste your script below:" default answer "require(14168421377).tyymenu(\"Tyuiss_RBLX\")" buttons {"X", "Clear", "Execute"} default button "Execute" cancel button "X" with icon note with title "Bozo Executer"
         end tell
         if button returned of dialogResult is "X" then exit repeat
@@ -133,13 +136,15 @@ ENDOFDYLIB
     chmod +x "$TEMP/insert_dylib"
 
     loader "Modifying Roblox..."
-    codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer >/dev/null 2>&1 || true
+    # THIS INJECTS INTO libmimalloc.3.dylib - The actual Mac modification
+    codesign --remove-signature ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib >/dev/null 2>&1 || true
+    
     "$TEMP/insert_dylib" --strip-codesig --all-yes \
       "@executable_path/../Resources/libBozoExecuter.dylib" \
-      ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer \
-      ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched >/dev/null 2>&1
+      ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib \
+      ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib_patched >/dev/null 2>&1
 
-    mv ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched ~/Applications/Roblox.app/Contents/MacOS/RobloxPlayer
+    mv ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib_patched ~/Applications/Roblox.app/Contents/MacOS/libmimalloc.3.dylib
 
     loader "Signing Client..."
     codesign --force --deep --sign - ~/Applications/Roblox.app >/dev/null 2>&1
