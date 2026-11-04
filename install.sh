@@ -126,7 +126,7 @@ static void execute(const char *src, char *out, size_t out_size) {
     g_out_len = 0; g_out[0] = '\0';
     if (!g_L) {
         snprintf(out, out_size,
-                 "BRIDGE OK — lua_State not attached yet.\n"
+                 "BRIDGE OK - lua_State not attached yet.\n"
                  "Script received (%zu bytes). Transport works; VM hook pending.\n", strlen(src));
         return;
     }
