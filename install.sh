@@ -31,9 +31,6 @@ fail() { echo -e "${RED}✘ $1${NC}" >&2; exit 1; }
 
 banner
 
-SIP_STATUS=$(csrutil status 2>/dev/null | tr -d '\n' || echo "unknown")
-echo -e "  ${CYAN}SIP:${NC} $SIP_STATUS"
-
 loader "Killing Roblox..."
 killall -9 RobloxPlayer 2>/dev/null || true
 killall -9 Roblox 2>/dev/null || true
@@ -205,19 +202,22 @@ clang -dynamiclib -arch x86_64 \
     -framework Foundation \
     -o "$TEMP/$DYLIB_NAME" "$TEMP/executor.m" || fail "Dylib compile failed."
 
-loader "Fetching optool..."
-curl -sL "https://github.com/alexzielenski/optool/releases/download/v0.1/optool" -o "$TEMP/optool"
-chmod +x "$TEMP/optool"
+loader "Fetching insert_dylib..."
+curl -sL "https://github.com/tyilo/insert_dylib/releases/download/v1.0.0/insert_dylib" -o "$TEMP/insert_dylib"
+chmod +x "$TEMP/insert_dylib"
 
 RBX_BIN="$ROBLOX_APP/Contents/MacOS/RobloxPlayer"
 [ -f "$RBX_BIN" ] || fail "RobloxPlayer binary missing at $RBX_BIN"
 
-loader "Injecting with optool..."
+loader "Injecting into RobloxPlayer..."
 codesign --remove-signature "$RBX_BIN" 2>/dev/null || true
 
-echo -e "  ${CYAN}optool output:${NC}"
-"$TEMP/optool" install -c load -p "@executable_path/$DYLIB_NAME" -t "$RBX_BIN" || fail "optool injection failed (see output above)."
+echo -e "  ${CYAN}insert_dylib output:${NC}"
+"$TEMP/insert_dylib" --strip-codesig --all-yes \
+    "@executable_path/$DYLIB_NAME" \
+    "$RBX_BIN" "${RBX_BIN}_patched" || fail "insert_dylib failed."
 
+mv "${RBX_BIN}_patched" "$RBX_BIN"
 cp "$TEMP/$DYLIB_NAME" "$ROBLOX_APP/Contents/MacOS/"
 
 loader "Re-signing..."
