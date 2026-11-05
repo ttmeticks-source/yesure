@@ -9,180 +9,189 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusLabel: NSTextField!
     private var sendButton: NSButton!
 
-    private let allowedTests: Set<String> = [
-        "remote_validation",
-        "movement_validation",
-        "rate_limit_validation",
-        "permission_validation"
+    private let allowedActions: Set<String> = [
+        "remote_validation", "movement_validation",
+        "rate_limit_validation", "permission_validation"
     ]
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        buildWindow()
-    }
+    private let panel = NSColor(calibratedRed: 0.105, green: 0.105, blue: 0.125, alpha: 1)
+    private let background = NSColor(calibratedRed: 0.045, green: 0.047, blue: 0.058, alpha: 1)
+    private let red = NSColor(calibratedRed: 0.92, green: 0.12, blue: 0.19, alpha: 1)
+
+    func applicationDidFinishLaunching(_ notification: Notification) { buildWindow() }
 
     private func buildWindow() {
-        let rect = NSRect(x: 0, y: 0, width: 760, height: 650)
-        window = NSWindow(
-            contentRect: rect,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
+        let frame = NSRect(x: 0, y: 0, width: 820, height: 700)
+        window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "BOZO EXECUTER"
         window.center()
-        window.minSize = NSSize(width: 650, height: 560)
-        window.backgroundColor = NSColor(calibratedRed: 0.055, green: 0.055, blue: 0.065, alpha: 1)
+        window.minSize = NSSize(width: 700, height: 620)
+        window.backgroundColor = background
 
-        let root = NSView(frame: rect)
+        let root = NSView(frame: frame)
         root.wantsLayer = true
-        root.layer?.backgroundColor = NSColor(calibratedRed: 0.055, green: 0.055, blue: 0.065, alpha: 1).cgColor
+        root.layer?.backgroundColor = background.cgColor
         window.contentView = root
 
-        let title = label("##### BOZO EXECUTER", size: 27, color: .systemRed, bold: true)
-        title.frame = NSRect(x: 28, y: 590, width: 500, height: 36)
+        let accent = NSView(frame: NSRect(x: 0, y: 0, width: 5, height: 700))
+        accent.wantsLayer = true
+        accent.layer?.backgroundColor = red.cgColor
+        root.addSubview(accent)
+
+        let title = makeLabel("BOZO EXECUTER", 28, red, true)
+        title.frame = NSRect(x: 30, y: 635, width: 450, height: 36)
         root.addSubview(title)
+        let sub = makeLabel("SERVER CONTROL  /  OWNER-AUTHORIZED COMMANDS", 10, .secondaryLabelColor, true)
+        sub.frame = NSRect(x: 32, y: 613, width: 500, height: 17)
+        root.addSubview(sub)
+        let version = makeLabel("MACOS • V1.1", 10, red, true)
+        version.alignment = .right
+        version.frame = NSRect(x: 650, y: 635, width: 135, height: 20)
+        root.addSubview(version)
 
-        let subtitle = label("ROBLOX SERVER TEST CONSOLE  •  CREATED BY c0olerishere", size: 11, color: .white, bold: false)
-        subtitle.frame = NSRect(x: 30, y: 568, width: 600, height: 18)
-        root.addSubview(subtitle)
-
-        addLabel("AUTHORIZED HTTPS BRIDGE URL", to: root, y: 525)
+        addPanel(root, NSRect(x: 25, y: 515, width: 770, height: 78))
+        addCaption("CONNECTION", root, 566)
         endpointField = NSTextField(string: "")
-        endpointField.placeholderString = "https://your-bridge.example/api/test"
-        endpointField.frame = NSRect(x: 30, y: 495, width: 700, height: 26)
+        endpointField.placeholderString = "https://your-own-bridge.example/api/command"
+        endpointField.frame = NSRect(x: 42, y: 530, width: 465, height: 27)
         styleField(endpointField)
         root.addSubview(endpointField)
 
-        addLabel("BRIDGE TOKEN (not saved)", to: root, y: 458)
         tokenField = NSSecureTextField(string: "")
-        tokenField.placeholderString = "Paste your bridge token"
-        tokenField.frame = NSRect(x: 30, y: 428, width: 700, height: 26)
+        tokenField.placeholderString = "Bridge access token"
+        tokenField.frame = NSRect(x: 520, y: 530, width: 255, height: 27)
         styleField(tokenField)
         root.addSubview(tokenField)
 
-        addLabel("TEST REQUEST JSON — NOT EXECUTABLE LUAU", to: root, y: 390)
-        let scroll = NSScrollView(frame: NSRect(x: 30, y: 155, width: 700, height: 220))
+        addPanel(root, NSRect(x: 25, y: 160, width: 770, height: 340))
+        addCaption("COMMAND PAYLOAD", root, 470)
+        let hint = makeLabel("JSON • approved command IDs only", 10, .secondaryLabelColor, false)
+        hint.frame = NSRect(x: 42, y: 448, width: 400, height: 16)
+        root.addSubview(hint)
+
+        let scroll = NSScrollView(frame: NSRect(x: 42, y: 205, width: 736, height: 225))
         scroll.hasVerticalScroller = true
         scroll.borderType = .noBorder
+        scroll.drawsBackground = false
         requestView = NSTextView(frame: scroll.bounds)
         requestView.isRichText = false
-        requestView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-        requestView.textColor = .white
-        requestView.backgroundColor = NSColor(calibratedRed: 0.10, green: 0.10, blue: 0.12, alpha: 1)
+        requestView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+        requestView.textColor = NSColor(calibratedRed: 0.88, green: 0.91, blue: 0.94, alpha: 1)
+        requestView.insertionPointColor = red
+        requestView.backgroundColor = NSColor(calibratedRed: 0.065, green: 0.067, blue: 0.08, alpha: 1)
+        requestView.textContainerInset = NSSize(width: 14, height: 14)
         requestView.string = "{\n  \"test\": \"remote_validation\"\n}"
         scroll.documentView = requestView
         root.addSubview(scroll)
 
-        let send = NSButton(title: "INJECT TEST", target: self, action: #selector(sendTest))
-        send.frame = NSRect(x: 30, y: 105, width: 160, height: 36)
-        send.bezelStyle = .rounded
-        send.contentTintColor = .white
-        send.layer?.backgroundColor = NSColor.systemRed.cgColor
-        sendButton = send
-        root.addSubview(send)
+        sendButton = makeButton("SEND COMMAND", #selector(sendCommand), width: 170)
+        sendButton.frame = NSRect(x: 42, y: 108, width: 170, height: 38)
+        root.addSubview(sendButton)
 
-        let clear = NSButton(title: "CLEAR", target: self, action: #selector(clearFields))
-        clear.frame = NSRect(x: 205, y: 105, width: 110, height: 36)
-        clear.bezelStyle = .rounded
+        let clear = makeButton("CLEAR EDITOR", #selector(clearEditor), width: 140)
+        clear.frame = NSRect(x: 224, y: 108, width: 140, height: 38)
         clear.contentTintColor = .white
         root.addSubview(clear)
 
-        statusLabel = label("STATUS: NOT CONNECTED", size: 12, color: .systemOrange, bold: true)
-        statusLabel.frame = NSRect(x: 30, y: 65, width: 700, height: 22)
+        statusLabel = makeLabel("●  DISCONNECTED — ENTER YOUR BRIDGE DETAILS", 11, .systemOrange, true)
+        statusLabel.frame = NSRect(x: 42, y: 65, width: 735, height: 22)
         root.addSubview(statusLabel)
 
-        let foot = label("Only allowlisted test IDs are sent. No arbitrary code execution is supported.", size: 10, color: .lightGray, bold: false)
-        foot.frame = NSRect(x: 30, y: 30, width: 700, height: 18)
-        root.addSubview(foot)
+        let footer = makeLabel("SECURE REQUEST MODE  •  NO ARBITRARY CODE EXECUTION", 9, .tertiaryLabelColor, true)
+        footer.frame = NSRect(x: 42, y: 28, width: 735, height: 18)
+        root.addSubview(footer)
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func label(_ text: String, size: CGFloat, color: NSColor, bold: Bool) -> NSTextField {
-        let field = NSTextField(labelWithString: text)
-        field.font = bold ? NSFont.boldSystemFont(ofSize: size) : NSFont.systemFont(ofSize: size)
-        field.textColor = color
-        return field
+    private func addPanel(_ root: NSView, _ frame: NSRect) {
+        let box = NSBox(frame: frame)
+        box.boxType = .custom
+        box.borderType = .noBorder
+        box.fillColor = panel
+        box.cornerRadius = 12
+        root.addSubview(box)
     }
 
-    private func addLabel(_ text: String, to view: NSView, y: CGFloat) {
-        let field = label(text, size: 11, color: .systemRed, bold: true)
-        field.frame = NSRect(x: 30, y: y, width: 700, height: 18)
-        view.addSubview(field)
+    private func makeLabel(_ text: String, _ size: CGFloat, _ color: NSColor, _ bold: Bool) -> NSTextField {
+        let v = NSTextField(labelWithString: text)
+        v.font = bold ? .boldSystemFont(ofSize: size) : .systemFont(ofSize: size)
+        v.textColor = color
+        v.lineBreakMode = .byTruncatingTail
+        return v
     }
 
-    private func styleField(_ field: NSTextField) {
-        field.font = NSFont.systemFont(ofSize: 13)
-        field.textColor = .white
-        field.backgroundColor = NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 1)
-        field.isBezeled = true
-        field.bezelStyle = .roundedBezel
+    private func addCaption(_ text: String, _ root: NSView, _ y: CGFloat) {
+        let v = makeLabel(text, 10, red, true)
+        v.frame = NSRect(x: 42, y: y, width: 400, height: 17)
+        root.addSubview(v)
     }
 
-    @objc private func clearFields() {
+    private func styleField(_ f: NSTextField) {
+        f.font = .systemFont(ofSize: 12)
+        f.textColor = .white
+        f.backgroundColor = NSColor(calibratedRed: 0.065, green: 0.067, blue: 0.08, alpha: 1)
+        f.isBezeled = true
+        f.bezelStyle = .roundedBezel
+    }
+
+    private func makeButton(_ title: String, _ action: Selector, width: CGFloat) -> NSButton {
+        let b = NSButton(title: title, target: self, action: action)
+        b.bezelStyle = .rounded
+        b.font = .boldSystemFont(ofSize: 11)
+        b.contentTintColor = .white
+        b.setButtonType(.momentaryPushIn)
+        return b
+    }
+
+    @objc private func clearEditor() {
         requestView.string = "{\n  \"test\": \"remote_validation\"\n}"
-        statusLabel.stringValue = "STATUS: CLEARED"
-        statusLabel.textColor = .secondaryLabelColor
+        setStatus("●  EDITOR CLEARED", .secondaryLabelColor)
     }
 
-    @objc private func sendTest() {
-        let endpointText = endpointField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    @objc private func sendCommand() {
+        let rawURL = endpointField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = tokenField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard let url = URL(string: endpointText),
-              url.scheme?.lowercased() == "https",
-              url.host != nil else {
-            setStatus("ERROR: ENTER A VALID HTTPS BRIDGE URL", color: .systemRed)
-            return
+        guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https", url.host != nil else {
+            setStatus("●  ERROR — ENTER A VALID HTTPS ENDPOINT", .systemRed); return
         }
-        guard !token.isEmpty else {
-            setStatus("ERROR: BRIDGE TOKEN IS REQUIRED", color: .systemRed)
-            return
-        }
-        guard let data = requestView.string.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let request = object as? [String: Any],
-              let testName = request["test"] as? String,
-              allowedTests.contains(testName) else {
-            setStatus("ERROR: INVALID JSON OR TEST ID NOT ALLOWED", color: .systemRed)
-            return
+        guard !token.isEmpty else { setStatus("●  ERROR — ACCESS TOKEN REQUIRED", .systemRed); return }
+        guard let body = requestView.string.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: body),
+              let payload = object as? [String: Any],
+              let action = payload["test"] as? String,
+              allowedActions.contains(action) else {
+            setStatus("●  REJECTED — INVALID JSON OR COMMAND NOT ALLOWED", .systemRed); return
         }
 
-        var http = URLRequest(url: url)
-        http.httpMethod = "POST"
-        http.timeoutInterval = 20
-        http.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        http.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        http.httpBody = data
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 25
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
 
         sendButton.isEnabled = false
-        setStatus("STATUS: SENDING AUTHORIZED TEST REQUEST…", color: .systemOrange)
-
-        URLSession.shared.dataTask(with: http) { [weak self] responseData, response, error in
+        setStatus("●  SENDING APPROVED COMMAND…", .systemOrange)
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.sendButton.isEnabled = true
-
                 if let error = error {
-                    self.setStatus("CONNECTION ERROR: \(error.localizedDescription)", color: .systemRed)
-                    return
+                    self.setStatus("●  CONNECTION FAILED — \(error.localizedDescription)", .systemRed); return
                 }
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    self.setStatus("ERROR: NO HTTP RESPONSE", color: .systemRed)
-                    return
+                guard let http = response as? HTTPURLResponse else {
+                    self.setStatus("●  NO SERVER RESPONSE", .systemRed); return
                 }
-                let responseText = responseData.flatMap { String(data: $0, encoding: .utf8) } ?? "(empty response)"
-                if (200...299).contains(httpResponse.statusCode) {
-                    self.setStatus("BRIDGE RESPONSE: HTTP \(httpResponse.statusCode) — \(responseText)", color: .systemGreen)
-                } else {
-                    self.setStatus("BRIDGE REJECTED: HTTP \(httpResponse.statusCode) — \(responseText)", color: .systemRed)
-                }
+                let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "(empty response)"
+                let safeText = String(text.prefix(180))
+                self.setStatus("●  HTTP \(http.statusCode) — \(safeText)", (200...299).contains(http.statusCode) ? .systemGreen : .systemRed)
             }
         }.resume()
     }
 
-    private func setStatus(_ text: String, color: NSColor) {
+    private func setStatus(_ text: String, _ color: NSColor) {
         statusLabel.stringValue = text
         statusLabel.textColor = color
     }
