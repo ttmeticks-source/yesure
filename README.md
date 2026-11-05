@@ -1,52 +1,60 @@
 # BOZO EXECUTER
 
-Roblox Server Test Console for macOS.
+Roblox server test console for macOS.
 
 Created by c0olerishere.
 
 ## Features
 
-- Native macOS application
+- Native macOS app built with Swift and AppKit
 - Dark red, black and white interface
-- Luau test editor
-- INJECT TEST button
-- CLEAR button
-- Authenticated HTTPS bridge
-- Server-side anti-cheat testing
-- Installation progress display
+- HTTPS request sender
+- Allowlisted test IDs only
+- INJECT TEST and CLEAR buttons
+- Bridge token entered at runtime and not saved by the app
 
 ## Requirements
 
 - macOS
-- Apple's Swift compiler
-- An authorized HTTPS testing bridge
-- Roblox HttpService enabled for your experience
+- Apple's Swift compiler (install with `xcode-select --install` if needed)
+- An HTTPS bridge that you own and operate
+- A Roblox experience you own, with any required server-side test code configured
 
-## Installation
+## Download and install
 
-Download the repository:
+Run these commands in Terminal:
 
-    curl -L -o BozoExecuter.zip https://github.com/USERNAME/Bozo-Executer/archive/refs/heads/main.zip
+```sh
+curl -L -o BozoExecuter.zip https://github.com/ttmeticks-source/yesure/archive/refs/heads/main.zip
+unzip -o BozoExecuter.zip
+cd yesure-main
+chmod +x install.sh
+./install.sh
+```
 
-Extract it:
+The installer creates and opens `Bozo Executer.app`.
 
-    unzip BozoExecuter.zip
+## Sending a test
 
-Enter the project:
+The app accepts JSON with one of these test IDs:
 
-    cd Bozo-Executer-main
+- `remote_validation`
+- `movement_validation`
+- `rate_limit_validation`
+- `permission_validation`
 
-Run the installer:
+Example request:
 
-    chmod +x install.sh
-    ./install.sh
+```json
+{
+  "test": "remote_validation"
+}
+```
 
-## Roblox setup
+Enter your own HTTPS endpoint and bridge token in the app. The bridge must accept a POST request with a JSON body and a `Authorization: Bearer <token>` header, then safely route the allowlisted test ID to your own Roblox test setup.
 
-Place ServerTestDispatcher.lua in ServerScriptService
-inside your own Roblox experience.
+## Important
 
-Configure your authorized HTTPS bridge separately.
+This repository includes the macOS request-sender app and a basic Roblox-side allowlist dispatcher. It does **not** include or host an HTTPS bridge, and the dispatcher is not automatically connected to Roblox or to this app. You must build and secure that bridge before the INJECT TEST button can reach your experience.
 
-This project uses allowlisted test requests.
-It does not execute arbitrary code on live Roblox servers.
+This is a test-request console, not an arbitrary Luau executor. It does not bypass Roblox security or run arbitrary code on live servers.
