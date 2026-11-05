@@ -1,28 +1,21 @@
 # BOZO EXECUTER
 
-Roblox server test console for macOS.
+A dark macOS server-control console for sending approved requests to an HTTPS bridge you own.
 
 Created by c0olerishere.
 
-## Features
+## What's included
 
-- Native macOS app built with Swift and AppKit
-- Dark red, black and white interface
-- HTTPS request sender
-- Allowlisted test IDs only
-- INJECT TEST and CLEAR buttons
-- Bridge token entered at runtime and not saved by the app
+- Native macOS interface built with Swift and AppKit
+- Dark red / charcoal control-console design
+- HTTPS connection field and token entry
+- JSON command editor
+- Live installer status with elapsed compile time
+- Allowlisted server-validation actions
 
-## Requirements
+## Build on macOS
 
-- macOS
-- Apple's Swift compiler (install with `xcode-select --install` if needed)
-- An HTTPS bridge that you own and operate
-- A Roblox experience you own, with any required server-side test code configured
-
-## Download and install
-
-Run these commands in Terminal:
+Paste these commands into Terminal:
 
 ```sh
 curl -L -o BozoExecuter.zip https://github.com/ttmeticks-source/yesure/archive/refs/heads/main.zip
@@ -34,16 +27,11 @@ chmod +x install.sh
 
 The installer creates and opens `Bozo Executer.app`.
 
-## Sending a test
+## Connection setup
 
-The app accepts JSON with one of these test IDs:
+You need an HTTPS bridge that you own and operate. Enter its HTTPS endpoint and bearer token in the app. The bridge must accept a JSON POST request with an `Authorization: Bearer <token>` header.
 
-- `remote_validation`
-- `movement_validation`
-- `rate_limit_validation`
-- `permission_validation`
-
-Example request:
+Example payload:
 
 ```json
 {
@@ -51,10 +39,15 @@ Example request:
 }
 ```
 
-Enter your own HTTPS endpoint and bridge token in the app. The bridge must accept a POST request with a JSON body and a `Authorization: Bearer <token>` header, then safely route the allowlisted test ID to your own Roblox test setup.
+Allowed request IDs are:
 
-## Important
+- `remote_validation`
+- `movement_validation`
+- `rate_limit_validation`
+- `permission_validation`
 
-This repository includes the macOS request-sender app and a basic Roblox-side allowlist dispatcher. It does **not** include or host an HTTPS bridge, and the dispatcher is not automatically connected to Roblox or to this app. You must build and secure that bridge before the INJECT TEST button can reach your experience.
+## Important limitations
 
-This is a test-request console, not an arbitrary Luau executor. It does not bypass Roblox security or run arbitrary code on live servers.
+The interface is presented as a server-control console, but the currently included server actions are validation checks. The repository does not include the HTTPS bridge or a live Roblox connection, so those must be configured separately.
+
+The app deliberately does not execute arbitrary Luau, inject scripts into Roblox, or bypass Roblox security. Only the listed request IDs can be sent.
